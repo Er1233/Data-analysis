@@ -10,8 +10,10 @@ This project uses machine learning (Logistic Regression) to predict stock price 
 - Accuracy evaluation with confusion matrix
 - Matplotlib & Seaborn visualization
 
+
 ## Usage
 
 ```bash
 pip install -r requirements.txt
 python stock_predictor.py
+
