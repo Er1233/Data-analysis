@@ -2,7 +2,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler, MinMaxScaler,OneHotEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 import numpy as np
 import pandas as pd
 
@@ -61,7 +61,7 @@ model = RandomForestRegressor(
     min_samples_split=5,
     min_samples_leaf=2,
     random_state=42,
-    n_jobs=1
+    n_jobs=-1
 
 )
 # fit model
@@ -81,5 +81,20 @@ print(f"\n===MODEL PERFORMANCE ===")
 print(f"R2 score: {r2:.4f}")
 print(f"RMSE: ${rmse:,.2f}")
 print(f"MAE: ${mae:,.2f}")
+#cross validation for more robust evaluation
 
+cv_score = cross_val_score(model, x_train_scaled,y_train,cv=5, scoring="r2")
+print(f"Cross-validation R2 scores: {cv_score}")
+print(f"mean CV r2 score: {cv_score.mean():.4f} (+/- {cv_score.std()*2:.4f})")
 
+#feature importance
+
+feature_importance = pd.DataFrame({
+    "feature": x.columns,
+    "importance": model.feature_importances_
+}).sort_values("importance", ascending=False)
+
+print(f"\n=== Top 10 MOST IMPORTANCE FEATURES ===")
+print(feature_importance.head(10))
+
+#Visualization
