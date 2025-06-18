@@ -1,55 +1,55 @@
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-from sklearn.preprocessing import StandardScaler, MinMaxScaler,OneHotEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
-import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 df = pd.read_csv("housing.csv")
-print("Original data shape:", df.shape)
-print("\n missing values")
+print(df.shape)
+print("Datatype", df.dtypes)
+print("\n Column: ")
+print(df.columns)
 print(df.isnull().sum())
-print("\n data type: ")
-print(df.dtypes)
- #feature Engineering
-df["rooms_per_household"] = df["total_rooms"] / df["households"]
-df["bedrooms_per_rooms"] = df["total_bedrooms"] / df["total_rooms"]
-df["population_per_household"] = df["population"] / df["households"]
-df["bedrooms_per_household"] = df["total_bedrooms"] / df["households"]
+
+#future engineering
+
+df["rooms_per_households"] = df["total_rooms"] / df["households"]
+df["bedrooms_per_room"] = df["total_bedrooms"] / df["total_rooms"]
+df["bedrooms_per_households"] = df["total_bedrooms"] / df["households"]
+df["population_per_households"] = df["population"] / df["households"]
 
 #handling missing values
 
 imputer = SimpleImputer(strategy="median")
-numerical_cols = df.select_dtypes(include=[np.number]).columns
-df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
+numerical_col = df.select_dtypes(include=[np.number]).columns
+df[numerical_col] = imputer.fit_transform(df[numerical_col])
 
-#encode categorical variable
-
+#encode categorical variables
 df_encoded = pd.get_dummies(df, columns=["ocean_proximity"], prefix="ocean", drop_first=True)
 
 #prepare x and y
+x = df_encoded.drop("median_income", axis=1)
 
-x = df_encoded.drop(["median_house_value"], axis=1)
-y  =df_encoded["median_house_value"]
+y = df_encoded["median_income"]
 
-#check skewness first
-print(f"\n Target variable skewness: {y.skew():.2f}")
+#log transform target
+print(f"Log transform target: {y.skew():.2f}")
 if y.skew() > 1:
     y = np.log(y)
-    print("Applied log transformation to target variable")
+    print("Applied log transformation to target")
 
-#train-test-split
-
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42, shuffle=True)
+#train test split
+x_train, x_test,y_train, y_test = train_test_split(x,y, random_state=42, test_size=0.2, shuffle=True)
 
 #feature scaling
 scaler = StandardScaler()
 x_train_scaled = scaler.fit_transform(x_train)
-x_test_scaled = scaler.transform(x_test)
+x_test_scaled = scaler.fit(x_test)
 
-#convert back to DataFrame for easier handling
-
+#convert back to dataframe for easier handling
 x_train_scaled = pd.DataFrame(x_train_scaled, columns=x.columns, index=x_train.index)
 x_test_scaled = pd.DataFrame(x_test_scaled, columns=x.columns, index=x_test.index)
 
@@ -57,44 +57,38 @@ x_test_scaled = pd.DataFrame(x_test_scaled, columns=x.columns, index=x_test.inde
 
 model = RandomForestRegressor(
     n_estimators=100,
+    random_state=42,
     max_depth=20,
     min_samples_split=5,
     min_samples_leaf=2,
-    random_state=42,
-    n_jobs=-1
-
+    n_jobs=1
 )
-# fit model
+#model fit
 model.fit(x_train_scaled, y_train)
 
-#prediction and Evaluation
-y_pred = model.predict((x_test_scaled))
+y_pred = model.predict(x_test_scaled)
 
 #calculate metrics
-
 mse = mean_squared_error(y_test, y_pred)
-rmse = np.sqrt(mse)
-mae = mean_absolute_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
 
-print(f"\n===MODEL PERFORMANCE ===")
-print(f"R2 score: {r2:.4f}")
-print(f"RMSE: ${rmse:,.2f}")
-print(f"MAE: ${mae:,.2f}")
-#cross validation for more robust evaluation
+print(f"Mean squared error: {mse}")
+print(f"r2 score: {r2}")
+print(f"mean absolute error: {mae}")
 
-cv_score = cross_val_score(model, x_train_scaled,y_train,cv=5, scoring="r2")
-print(f"Cross-validation R2 scores: {cv_score}")
-print(f"mean CV r2 score: {cv_score.mean():.4f} (+/- {cv_score.std()*2:.4f})")
+print(f"\n=== SAMPLE PREDICTIONS ===")
+for i in range(3):
+    actual = y_test.iloc[i]
+    predicted = y_pred[i]
+    error = abs(actual - predicted)
+    error_pct = (error / actual) * 100
 
-#feature importance
+    print(f"Sample {i + 1}:")
+    print(f"  Actual: ${actual:,.2f}")
+    print(f"  Predicted: ${predicted:,.2f}")
+    print(f"  Error: ${error:,.2f} ({error_pct:.1f}%)")
+    print()
 
-feature_importance = pd.DataFrame({
-    "feature": x.columns,
-    "importance": model.feature_importances_
-}).sort_values("importance", ascending=False)
 
-print(f"\n=== Top 10 MOST IMPORTANCE FEATURES ===")
-print(feature_importance.head(10))
 
-#Visualization
