@@ -1,94 +1,85 @@
-from sklearn.model_selection import train_test_split
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+
 
 df = pd.read_csv("housing.csv")
-print(df.shape)
-print("Datatype", df.dtypes)
-print("\n Column: ")
 print(df.columns)
 print(df.isnull().sum())
 
-#future engineering
-
-df["rooms_per_households"] = df["total_rooms"] / df["households"]
-df["bedrooms_per_room"] = df["total_bedrooms"] / df["total_rooms"]
-df["bedrooms_per_households"] = df["total_bedrooms"] / df["households"]
-df["population_per_households"] = df["population"] / df["households"]
+#feature engineering
+df['rooms_per_households'] = df['total_rooms'] / df['households']
+df['population_per_household'] = df['population'] / df['households']
+df['bedrooms_per_rooms'] = df['total_bedrooms'] / df['total_rooms']
+df['bedrooms_per_households'] = df['total_bedrooms'] / df['households']
 
 #handling missing values
+imputer = SimpleImputer(strategy='median')
+numerical_column = df.select_dtypes(include=[np.number],).columns
+df[numerical_column] = imputer.fit_transform(df[numerical_column])
 
-imputer = SimpleImputer(strategy="median")
-numerical_col = df.select_dtypes(include=[np.number]).columns
-df[numerical_col] = imputer.fit_transform(df[numerical_col])
-
-#encode categorical variables
-df_encoded = pd.get_dummies(df, columns=["ocean_proximity"], prefix="ocean", drop_first=True)
+#encode categorical variable
+df_encode = pd.get_dummies(df, columns=['ocean_proximity'], prefix='ocean', drop_first=True)
 
 #prepare x and y
-x = df_encoded.drop("median_income", axis=1)
+x = df_encode.drop('median_house_value', axis=1)
+y = df_encode['median_house_value']
 
-y = df_encoded["median_income"]
-
-#log transform target
+#log transform
 print(f"Log transform target: {y.skew():.2f}")
 if y.skew() > 1:
     y = np.log(y)
     print("Applied log transformation to target")
 
 #train test split
-x_train, x_test,y_train, y_test = train_test_split(x,y, random_state=42, test_size=0.2, shuffle=True)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42, shuffle=True)
 
-#feature scaling
+#scale
 scaler = StandardScaler()
-x_train_scaled = scaler.fit_transform(x_train)
-x_test_scaled = scaler.fit(x_test)
+x_train_scale = scaler.fit_transform(x_train)
+x_test_scale = scaler.transform(x_test)
 
-#convert back to dataframe for easier handling
-x_train_scaled = pd.DataFrame(x_train_scaled, columns=x.columns, index=x_train.index)
-x_test_scaled = pd.DataFrame(x_test_scaled, columns=x.columns, index=x_test.index)
+#change back to a dataframe
+x_train_scale = pd.DataFrame(x_train_scale, columns=x.columns, index=x_train.index)
+x_test_scale = pd.DataFrame(x_test_scale, columns=x.columns, index=x_test.index)
 
-#model training with better hyperparameters
-
+#model
 model = RandomForestRegressor(
     n_estimators=100,
-    random_state=42,
+    n_jobs=1,
     max_depth=20,
     min_samples_split=5,
-    min_samples_leaf=2,
-    n_jobs=1
+    min_samples_leaf=2
 )
+
 #model fit
-model.fit(x_train_scaled, y_train)
+model.fit(x_train_scale, y_train)
 
-y_pred = model.predict(x_test_scaled)
+#model Prediction
+y_pred = model.predict(x_test_scale)
 
-#calculate metrics
+#metrics calculation
 mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
 mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"Mse {mse:.4f}")
+print(f"MAE: {mae:.4f}")
+print(f"R2 score: {r2:.4f}")
 
-print(f"Mean squared error: {mse}")
-print(f"r2 score: {r2}")
-print(f"mean absolute error: {mae}")
+#sample prediction
+print("creating Sample prediction.....")
 
-print(f"\n=== SAMPLE PREDICTIONS ===")
 for i in range(3):
     actual = y_test.iloc[i]
-    predicted = y_pred[i]
-    error = abs(actual - predicted)
-    error_pct = (error / actual) * 100
-
-    print(f"Sample {i + 1}:")
-    print(f"  Actual: ${actual:,.2f}")
-    print(f"  Predicted: ${predicted:,.2f}")
-    print(f"  Error: ${error:,.2f} ({error_pct:.1f}%)")
+    predict = y_pred[i]
+    error = abs(actual - predict)
+    error_pct = (error / actual)*100
+    print(f'Sample {i +1}')
+    print(f"Actual {actual:.4f}")
+    print(f"prediction {predict:.4f}")
+    print(f"errors: {error:.2f}, {error_pct:.1f}%")
     print()
-
-
-
